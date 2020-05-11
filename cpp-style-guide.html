@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>C++ Style Guide</title>
+    <style>
+      * { font-family: arial; }
+      li { margin: 1em; }
+      ul.followup li { margin: 0em; }
+      ul#toc li { margin: 0em; }
+      .recommend { color: green; font-weight: bold; }
+      .discourage { color: darkred; font-weight: bold; } 
+    </style>
+  </head>
+  <body>
+    <h1>C++ Style Guide</h1>
+    <p>Version 4.0. Maintained by Ken Rossato. Please include the version number in any correspondence.</p>
+    <h2>Table of Contents</h2>
+    <ul id="toc">
+      <li><a href="#codeguidelines">Code Guidelines</a>
+        <ul>
+          <li><a href="#architecture">Architecture</a></li>
+          <li><a href="#memory">Memory Management</a></li>
+          <li><a href="#exceptions">Exceptions</a></li>
+          <li><a href="#constructors">Constructors</a></li>
+          <li><a href="#destructors">Destructors</a></li>
+          <li><a href="#templates">Templates</a></li>
+          <li><a href="#polymorphism">Polymorphism</a></li>
+          <li><a href="#threading">Threading</a></li>
+          <li><a href="#misc">Miscellaneous</a></li>
+      </ul></li>
+      <li><a href="#mechanics">Mechanical Style</a>
+        <ul>
+          <li><a href="#compilation">Compilation</a></li>
+          <li><a href="#directories">Directory Structure</a></li>
+          <li><a href="#headers">Header Files</a></li>
+          <li><a href="#sources">Source Files</a></li>
+          <li><a href="#spacing">Spacing</a></li>
+          <li><a href="#switch">&quot;Switch&quot; Statements</a></li>
+          <li><a href="#casing">Casing</a></li>
+          <li><a href="#classes">Classes</a></li>
+          <li><a href="#constants">Constants</a></li>
+      </ul></li>
+      <li><a href="#references">References and Supplemental Reading Material</a></li>
+    </ul>
+    <h2 id="codeguidelines">Code Guidelines</h2>
+    <h3 id="architecture">Architecture</h3>
+    <ul>
+      <li><strong class=recommend>Have a clear hierarchy of ownership between objects.</strong><br>Objects own their by-value member variables, containers own their contents, and so on.  A clear ownership hierarchy will assist determinations of what references and pointers can safely be held without risk of dangling.</li>
+      <li><strong class=recommend>Have a clear hierarchy of reference between types.</strong><br>This is similar to the ownership hierarchy, but not necessarily the same.  For example, std::vector owns objects but has no reference to their type because of templating.  Infrastructure should be at the bottom of a type hierarchy and business logic at the top. [<a href="#lakos">Lakos</a>]</li>
+      <li><strong class=recommend>In large projects, consider componentization.</strong><br>Group classes into components by related responsibility.  Keep a component's classes in a distinct directory and namespace.  Components should be understandable in isolation from other components.  Maintain a clear hierarchy of reference between components.</li>
+      <li><strong class=discourage>Eschew circular ownership and circular type dependencies.</strong><br>Ownership cycles can be broken by references and pointers.  Dependency cycles can be broken by templates and polymorphism.</li>
+    </ul>
+
+    <h3 id="memory">Memory Management</h3>
+    <ul>
+      <li>Construct directly into target memory, preferably in contiguous blocks.  Avoid individual heap allocations, which are expensive especially in multithreaded programs:
+        <ul>
+          <li><strong class=recommend>Prefer to construct short-lived objects directly into locals</strong><br>...than into managed pointers.</li>
+          <li><strong class=recommend>Prefer to construct long-lived objects directly into parent objects, STL collections, or static memory</strong><br>...than into managed pointers.  Std::unique_ptr should only be necessary for implementation-hiding (with PIMPL) or polymorphism, and std::shared_ptr should only be necessary in very rare cases where ownership is truly shared.  A clear hierarchy of ownership simplifies code and also helps make clear when it is safe to store references and observer pointers.</li>
+          <li><strong class=recommend>Prefer &quot;emplace&quot; over &quot;push&quot; or &quot;insert&quot;</strong><br>...methods for STL collections [<a href="#emcpp">EMC++</a> Item 42]</li>
+          <li><strong class=recommend>Prefer std::array and std::vector</strong><br>...over other container types.  Prefer std::array to C-style arrays.</li>
+          <li><strong class=recommend>Reserve estimated capacity for vectors.</strong><br>Err on the side of wildly over-reserving, such as by a factor of 5 over expected typical usage. [<a href="#estl">ESTL</a> Item 14]</li>
+          <li><strong class=recommend>Prefer value types in classes over pointer types.</strong><br>Has-a (composition) and is-a (inheritance) relationships can ensure members use neighboring memory and share an allocation, while still separating responsibilities (including construction and destruction).  [<a href="#ecpp">EC++</a> Item 19]</li>
+          <li><strong class=recommend>Consider Boost pool allocators for collections of objects with very large sizeof().</strong></li>
+          <li><strong class=recommend>Prefer clearing and reusing vectors and strings over replacing them with new copies.</strong><br>Vector and string implementations may reuse previously allocated memory, saving calls to new/delete.</li>
+          <li><strong class=discourage>Avoid explicit calls to &quot;new&quot; and &quot;delete&quot;.</strong><br>Using bare pointers to manage memory is exception-unsafe.  Instead prefer creating variables by value in a class member field, a local, or inside an STL collection with &quot;emplace&quot;.  If individual heap allocation is necessary, prefer managed pointers (shared_ptr, weak_ptr, and unique_ptr), which automatically delete.  Be sure to use make_shared for contiguous allocation with a shared pointer&apos;s control block.  [<a href="#emcpp">EMC++</a> Item 21]</li>
+      </ul></li>
+      <li>Access memory efficiently:
+        <ul>
+          <li><strong class=recommend>Select STL collections for the efficiency of their access pattern.</strong><br>Prefer (in this order): std::arrays/vectors for iteration efficiency, std::deques/queues for insertion/deletion at the ends, std::lists for frequent insertion/deletion by iterator, std::maps for key-lookup, and std::sets for de-duplication.  Understand the efficiency cost of every STL method you use.</li>
+          <li><strong class=recommend>Consider algorithms that can make vectors competitive with other choices.</strong><br>For example, you can delete from the middle of a vector in O(1) time when order doesn&apos;t matter (move-assign from back() and then pop_back()). As another example, functions from &lt;algorithm&gt; can perform a binary search on a sorted vector exactly as fast as traversing a std::map, if the vector doesn&apos;t frequently need to be re-sorted (if inserts and deletes are rare). [<a href="#estl">ESTL</a>]</li>
+          <li><strong class=recommend>Use iterators and ranged-for (&quot;foreach&quot;) loops.</strong><br>Assume operations on iterators are as cheap as their native equivalent (pointers, indexes, etc).  Pass and store iterators by value.  Cache begin() and end() when used in a loop and read STL documentation to understand which collection methods invalidate iterators.</li>
+          <li><strong class=recommend>Prefer &quot;auto&quot; (with correct const-ness and ref-ness) for storing short-lived locals returned from functions,</strong><br>...especially for iterators and ranged-for loops. In addition to being concise, it may avoid unintended casts. [<a href="#emcpp">EMC++</a> Item 5]</li>
+          <li><strong class=recommend>Return new objects by value, the compiler will elide the copy</strong><br>...(or worst-case convert it to a move).  Understand the C++17 rules for guaranteed copy ellision, since chances are even pre-C++17 compilers will make this optimization.  Understand the usual cases in which named return value optimization (NVRO) is performed.  For polymorphic values, returning by unique_ptr may be desirable.  Don&apos;t ever return a reference (even an rvalue reference) or pointer to a local variable in a function: if it doesn&apos;t lead to a memory error it will be purely by coincidence, as it will be a reference to an expired value on the stack.</li>
+          <li><strong class=discourage>Don&apos;t &quot;return std::move(x);&quot;</strong><br>...when &quot;x&quot; is a local variable.  This behavior is already ensured by the standard, and this syntax may inhibit return value optimization.</li>
+          <li><strong class=discourage>Don&apos;t pass strings or collections by value or otherwise copy them.</strong><br>Prefer passing by (const-)reference instead.  Yes, moves may make passing by value cheaper, but...</li>
+          <li><strong class=discourage>Don&apos;t assume a move operation is inexpensive.</strong><br>A move should be no more expensive than a copy, but isn&apos;t always constant-time.  In particular consider the short-string optimization as a reason to avoid moves of strings. [<a href="#emcpp">EMC++</a> Item 29]</li>
+      </ul></li>
+    </ul>
+
+    <h3 id="exceptions">Exceptions</h3>
+    <ul>
+      <li>Avoid the runtime and maintenance overhead of error checking when actions are expected to succeed (the &quot;happy path&quot;):
+        <ul>
+          <li><strong class=recommend>Prefer throwing exceptions instead of returning error codes.</strong><br>Explicit error checking introduces a non-zero performance penalty, as well as having to properly maintain correctness for all possible errors, which could be difficult to do consistently in a large software project.  The &quot;long jump&quot; of going directly from the generation of an exception to the error handler in a catch-block avoids the need to check for the same error repeatedly down a function chain.</li>
+          <li><strong class=recommend>Prefer versions of library calls that throw exceptions instead of returning empty values or errors</strong><br>...(prefer std::map::at).</li>
+          <li><strong class=recommend>Understand the situations where simplicity and performance favor returning a sentinel value instead.</strong><br>&quot;Throw&quot; has a significant performance overhead, so while exceptions should be prefered by default, it should only be in the (normal) case where failure is significantly less likely than success.  For areas of code that are tightly looped or performance-critical, or where failure is a common expected case, or where the error is immediately handled by the calling function, status codes or null/empty return values may be preferable. These cases should be carefully documented in comments, as they violate the RAII expectation that resources returned by a function are valid.</li>
+          <li><strong class=recommend>For every exception you throw, know where you intend to catch that exception.</strong><br>Similarly, for every try-catch block, know where you expect exceptions to be thrown.  A thrown exception is a &quot;long jump&quot; directly to an an error handler, and as such the exception and handler should be thought of in pairs.  Do not throw without thinking about how it will be caught, or catch without thinking about what will be thrown.</li>
+          <li><strong class=discourage>Don&apos;t use catch(...) (catch-all) or catch an exception just to log or otherwise ignore it.</strong><br>A thrown exception means something in your program didn&apos;t do what you told it to, and is now in a different state than you expect it to be in.  If you don&apos;t know what this exception is or how to clean up after its occurance, this creates the potential for subsequent incorrect behavior, including possible data corruption and security violations.  It may be much more preferable to allow the exception to propagate, even if this means the crash of the program (which will at least provide a meaningful backtrace close to the original error).  See also the section on Destructors.</li>
+      </ul></li>
+    </ul>
+
+    <h3 id="constructors">Constructors</h3>
+    <ul>
+      <li>Enable efficient creation of a class:
+        <ul>
+          <li><strong class=recommend>Prefer constructors over factories</strong><br>...for non-polymorphic classes.  This allows direct emplacement in STL classes and shared_ptrs.  It is syntactically possible to implement the factory pattern without pointers using templates, but it&apos;s convoluted and ugly.</li>
+          <li><strong class=recommend>Declare constructors &quot;constexpr&quot; when possible.</strong><br>Understand the uses of constexpr to initialize statically-sized resources such as constant tables. [<a href="#emcpp">EMC++</a> Item 15]</li>
+          <li><strong class=recommend>Prefer constructor delegation (with &quot;constexpr&quot; when possible)</strong><br>...over duplicate code or non-constructor &quot;init&quot; methods.</li>
+          <li><strong class=discourage>Avoid the PIMPL idiom,</strong><br>...except in the specific case of writting library interface classes.  Don&apos;t be eager to hide the memory layout of a class from yourself.  This mandates that constructors invoke an additional heap allocation, causing heap fragmentation, and can add unnecessary indirection for otherwise inlineable function calls.</li>
+      </ul></li>
+      <li>Ensure correct copy and move behavior:
+        <ul>
+          <li><strong class=recommend>Examine the correctness of the default behavior (member-wise action) of the &quot;big 5&quot;,</strong><br>...and define these functions if that behavior is insufficient.  If a class is used in an STL container, all of the big 5 could be used:
+            <ul class="followup">
+              <li>Copy constructor</li>
+              <li>Copy assignment operator</li>
+              <li>Move constructor</li>
+              <li>Move assignment operator</li>
+              <li>Destructor</li>
+          </ul></li>
+          <li><strong class=recommend>Best if possible is to implement the &quot;big 0&quot;</strong><br>Design your class so that it is correct with the default (memberwise) destructor, copy, and move operators.</li>
+          <li><strong class=recommend>If any of the &quot;big 5&quot; are declared, prefer to declare all of them,</strong><br>...whether by writing, defaulting, or deleting them.  This will reduce confusion.</li>
+          <li><strong class=recommend>If any of the &quot;big 5&quot; are declared, move operations MUST be declared</strong><br>...(possibly with &quot;default&quot;), otherwise the compiler will not automatically create one, and operations that should be moves will be copies instead. [<a href="#emcpp">EMC++</a> Item 17]</li>
+          <li><strong class=recommend>If a class is non-copyable, move operations must be declared to be usable in some STL containers.</strong><br>One potential reason to disallow both copies AND moves is for Observers or callbacks that depend on continued validity of an object at an address (but consider managed pointers or refactoring).</li>
+          <li><strong class=recommend>Ensure correct usage of std::move</strong><br>...inside move constructors and other functions with rvalue-reference arguments, to avoid accidentally converting rvalues to lvalues and thus converting moves to copies. [<a href="#emcpp">EMC++</a> Item 23].</li>
+          <li><strong class=recommend>Designate move constructors and move assignment operators as &quot;noexcept&quot; whenever possible</strong><br>...for more efficient STL operations. Most importantly, this will determine whether moves or copies are used when vectors are resized. [<a href="#emcpp">EMC++</a> Item 14]</li>
+          <li><strong class=discourage>Avoid copy- and move-assignment operators that leave the object in an inconsistent state on exception.</strong><br>The &quot;construct-and-swap&quot; idiom is a useful mechanism to make assignment exception-safe. [<a href="#xcpp">XC++</a>]</li>
+      </ul></li>
+      <li>Other constructor issues:
+        <ul>
+          <li><strong class=recommend>Be aware constructors will not call the destructor on exception,</strong><br>...but will destruct members.  Guard against leaks of resources allocated in constructors with try/catch if necessary.</li>
+          <li><strong class=recommend>Use &quot;explicit&quot; on single-argument constructors</strong><br>...to guard against constructors being used by the compiler for implicit casting.</li>
+          <li><strong class=recommend>Ensure Resource Acquisition Is Initialization (RAII).</strong><br>Constructors should either throw an exception or return an object that is immediately usable just like any other instance of that object, without any need for another call to an &quot;init&quot;, &quot;connect&quot;, or &quot;start&quot; method.  A possible exception to this rule is a class with a state-machine design.  In a similar vein, shared_ptrs should always be dereferenceable; avoid constructing a shared_ptr with the default constructor or resetting one to empty, unless this is in a performance-critical area of code and well-documented.  The goal should be to avoid the need to litter code with null checks &quot;just in case&quot;.</li>
+      </ul></li>
+    </ul>
+    
+    <h3 id="destructors">Destructors</h3>
+    <ul>
+      <li>Avoid the subtle pitfalls of exceptions in destructors:
+        <ul>
+          <li>A C++ destructor has two responsibilities: (1) to release resources, and (2) to not throw exceptions.  <strong>Any application goals beyond that must be subsidiary to those first two responsibilities.</strong></li>
+          <li><strong class=recommend>Ensure destructors do not throw.</strong><br>An exception propagating outside a destructor can, under the right conditions (and always, from C++11 onward), result in program termination.  Care must be taken to ensure that logic inside a destructor not allow exceptions to be generated, nor call standard library (or other library) functions that can throw an exception.  If a destructor must make dangerous calls, it should catch and handle possible exceptions consistent with the guidelines in the Exceptions section.  [<a href="#ecpp">EC++</a> Item 8]</li>
+          <li><strong class=recommend>Ensure all logic paths that reclaim resources cannot be skipped by exceptions.</strong><br>If you use a try-catch block in a destructor, be 100% sure that throwing an exception will not skip code that frees memory, closes file handles, drops weak_ptrs/observers, or otherwise releases resources.  These are operations that must succeed.</li>
+          <li><strong class=recommend>Prefer dividing destructor activities into shorter destructors in smaller classes.</strong><br>The unique_ptr class in C++11 is an extreme and instructive example: it exists only to ensure memory pointed to by a pointer gets deallocated on destruction.  Classes organized around individual resources can help compose larger classes, ensuring destruction behavior is correct without the need for complicated error-handling routines or even an explicit destructor.</li>
+          <li><strong class=recommend>Do not blindly catch-all in destructors.</strong><br>See the corresponding guideline in the Exceptions section.  An exception indicates that a requested operation did not occur and that your program is now in an undesired state.  Allowing a program to proceed after this point could result in undefined behavior, including data corruption or security violations.  It may be more safe to allow a program to terminate, since at least you will have a backtrace closer to the underlying issue.</li>
+          <li><strong class=discourage>Avoid calling business logic in destructors.</strong><br>The surest way to deal with the above problems is to follow the rule of thumb &quot;do nothing in destructors, unless not doing it would result in a leak&quot;.  Release file handles and delete memory (or even better, use members variables that do it for you when THEY destruct), but do not attempt to perform any &quot;graceful cleanup&quot; logic.  Any such logic should be in functions (e.g.: &quot;Close&quot;) that get called before destructors run. [<a href="#ecpp">EC++</a> Item 8]</li>
+      </ul></li>
+    </ul>
+
+    <h3 id="templates">Templates</h3>
+    <ul>
+      <li>Generate function and operator overloads on-demand with templates:
+        <ul>
+          <li><strong class=recommend>Template individual class methods and functions when an algorithm works on multiple types</strong><br>...such as when passing an argument onward to a stream operator for logging or output.  This may require a non-templated &quot;base case&quot;.  Remember the Robustness Principle: be generous in what you accept. [<a href="#ecpp">EC++</a> Item 45]</li>
+          <li><strong class=recommend>Prefer templates over std::function for passing functors.</strong><br>Many types can implement the parentheses operator: classes, function pointers, lambdas, std::binds, and std::functions.  Because std::function has to be able to encapsulate all the others, it has the greatest level of run-time overhead.  Instead of accepting std::functions, template function arguments on functor type. [<a href="#emcpp">EMC++</a> Item 5]</li>
+          <li><strong class=recommend>Pass templated function arguments by (const-)reference.</strong><br>Do not code as if a templated argument will be of a small type, unless this is a reasonable assumpion in context (e.g. if the argument is supposed to be an iterator type).</li>
+          <li><strong class=recommend>Correctly use universal (&quot;forwarding&quot;) references and std::forward</strong><br>...for templated methods that can accept both lvalue- and rvalue-references. This will preserve the &quot;rvalue&quot;-ness of the argument, correctly choosing between copy and move operations in subsequent function calls. [<a href="#emcpp">EMC++</a> Item 25]</li>
+          <li><strong class=discourage>Avoid universal reference parameters that come from a class template.</strong><br>These aren&apos;t universal references.  Since a class&apos;s template type will never be a reference type, &quot;T&amp;&amp;&quot; will always resolve to an rvalue-reference and won't bind to lvalues.  To workaround, best is to explicitly write two versions of the function for &quot;T&amp;&quot; and &quot;T&amp;&amp;&quot;, but also possible is to template the method on another type &quot;U&amp;&amp;&quot;. [<a href="#emcpp">EMC++</a> Item 24]</li>
+      </ul></li>
+      <li>Use templates to separate implementation from interface (duck-typing):
+        <ul>
+          <li><strong class=recommend>Template on types above your level of responsibility.</strong><br>Infrastructure code should not have dependencies on business-logic code, doing so introduces unnecessary coupling and makes it harder to understand behavior in isolated chunks.  Conversely, don&apos;t go nuts templating out references to sister classes within a logical component, or templating out infrastructure code in business logic, as this obfuscates a true dependency and unnecessarily bloats code size and compile times.</li>
+          <li><strong class=recommend>Use polymorphism to hide internal templating from external components</strong><br>...such as when using trait classes/structs.  This separates unnecessary implementation and policy details from a consumer, and also &quot;breaks the chain of templating&quot;, meaning that consuming classes don&apos;t themselves need to be templated on dependent types.</li>
+          <li><strong class=recommend>Use &quot;extern template&quot; declarations in header files to minimize recompilations of common template specializations.</strong><br>Then specify that template specialization in a cpp file.  This goes a long way toward reducing the compile-time overhead of using templates.</li>
+      </ul></li>
+    </ul>
+
+    <h3 id="polymorphism">Polymorphism</h3>
+    <ul>
+      <li>Avoid the runtime overhead of polymorphism when possible:
+        <ul>
+          <li><strong class=recommend>Prefer non-polymorphic classes to polymorphic classes.</strong><br>Polymorphic classes are classes with &quot;virtual&quot; methods.  Virtual methods result in the creation of a class &quot;vtable&quot;, an additional layer of runtime indirection for function calls.</li>
+          <li><strong class=recommend>Prefer templates to polymorphism.</strong><br>Polymorphism is solely to solve the problem of dynamic dispatch, which is a need that shouldn&apos;t be terribly frequent.  True use cases for dynamic dispatch are activities such as selecting an action from user input, or queuing activities for a threaded handler. Otherwise, classes that have pluggable strategy/policy behavior or dependencies are candidates for templating instead of polymorphism.</li>
+      </ul></li>
+      <li>Minimize the runtime overhead when polymorphism is necessary:
+        <ul>
+          <li><strong class=recommend>Prefer polymorphic classes over other forms of dynamic dispatch.</strong><br>E.g. prefer over designs that use function pointers, lambdas, or std::bind.</li>
+          <li><strong class=recommend>Isolate non-polymorphic behavior from polymorphic behavior</strong><br>...with a &quot;wide pointer&quot; pattern: a non-polymorphic owner class with common data members and a std::unique_ptr to a polymorphic type.  Ensure the constructor implements the factory pattern so you can directly emplace these &quot;wide pointers&quot; into collections.</li>
+          <li><strong class=recommend>Declare destructors of a polymorphic base class, and declare them &quot;virtual&quot;.</strong><br>Also understand the occasional use cases for virtual destructors in otherwise non-polymorphic base classes (such as when returning pointers with the factory pattern). [<a href="#ecpp">EC++</a> Item 7]</li>
+          <li><strong class=discourage>Avoid making non-polymorphic methods virtual</strong><br>...except for destructors as noted above.</li>
+      </ul></li>
+      <li>Use polymorphism safely and correctly:
+        <ul>
+          <li><strong class=recommend>Use the &quot;override&quot; keyword</strong><br>...on implementations of virtual methods in derived classes to avoid typos or implementing the wrong type signature (which otherwise will silently succeed but never be called). [<a href="#emcpp">EMC++</a> Item 12]</li>
+          <li><strong class=recommend>Define overridden functions as &quot;virtual&quot;</strong><br>...in derived classes (this is the default, but be explicit).</li>
+          <li><strong class=recommend>Define overridden functions as &quot;noexcept&quot; if the base class version is &quot;noexcept&quot;</strong><br>...(this is the default, but be explicit).</li>
+          <li>The full correct signature of an override of std::exception::what is:
+            <ul class="followup">
+              <li>&quot;virtual const char *what() const noexcept override&quot;</li>
+          </ul></li>
+          <li><strong class=discourage>Do not &quot;hide&quot; base-class functions by writing a non-virtual function with the same name.</strong><br>Use a different name.  If that doesn&apos;t work because the purpose is static polymorphism (templating), then declare the function virtual and use proper dynamic polymorphism. You never know when a derived class will be consumed as a reference to the base class. [<a href="#ecpp">EC++</a> Item 33]</li>
+      </ul></li>
+    </ul>
+
+    <h3 id="threading">Threading</h3>
+    <ul>
+      <li><strong class=recommend>Prefer an asynchronous proactor model over threading,</strong><br>...such as implemented by the Boost::ASIO library.  Asynchronous programming with modern OS support (such as epoll on Linux) is very fast, and ensures additional overhead isn&apos;t incurred by the frequent locking of global state that&apos;s needed by threaded programs.  In cases where there is significant mutable global state, a single-threaded asynchronous application may outperform a multi-threaded implementation.  In cases with minimal mutable global state (such as a web server), a proactor can be combined with threads to implement a high-performance M:N task-servicing model.</li>
+      <li><strong class=recommend>Give threads logically independent work</strong><br>...that can be completed without dependence on other threads.  This is important to minimize the amount of synchronized state between threads, which in addition to improving correctness, also improves performance on modern processors.</li>
+      <li><strong class=recommend>Communicate between threads cautiously.</strong><br>Share data using thread-safe queuing algorithms that can be simultaneously pushed into and pulled from.  Do not be eager to directly share state with data structures protected by locks.</li>
+      <li><strong class=discourage>Avoid Threading.</strong><br>
+        Threading is difficult to get right and easy to get wrong.</li>
+    </ul>
+
+    <h3 id="misc">Miscellaneous</h3>
+    <ul>
+      <li><strong class=recommend>Prefer nullptr to 0 or NULL</strong><br>...to avoid incorrect type inferences and implicit casts. [<a href="#emcpp">EMC++</a> Item 8]</li>
+      <li><strong class=recommend>Prefer C++11 &quot;using&quot;-style type aliases to typedefs</strong><br>[<a href="#emcpp">EMC++</a> Item 9]</li>
+      <li><strong class=recommend>Use type aliases vigorously inside a class, or even better template on the type.</strong><br>Consider type aliases to factor out common references to STL types within a class.</li>
+      <li><strong class=recommend>Prefer C++11-style scoped enums</strong><br>...(&quot;enum class&quot;).  [<a href="#emcpp">EMC++</a> Item 10]</li>
+      <li><strong class=recommend>Prefer forward-declaring a class to including its header</strong><br>...when the class is only referred to in that file as a pointer or reference, and no methods are invoked. [<a href="#ecpp">EC++</a> Item 31]</li>
+      <li><strong class=discourage>Don&apos;t use std::move on a dereferenced managed pointer</strong><br>...unless you&apos;re 100% sure the managed pointer won&apos;t be used again elsewhere.</li>
+      <li><strong class=discourage>Aside from move constructors and universal references, explicit uses of rvalue-reference parameters should be rare,</strong><br>...and should be studied to ensure their correctness.  Use std::move to preserve the &quot;rvalue&quot;-ness of an rvalue-reference.</li>
+      <li><strong class=discourage>Don&apos;t use #define for constants,</strong><br>...use constexpr static types within a class (even a completely static class) instead.  Strings that need to use C&apos;s compile-time concatenation syntax (&quot;string1&quot; &quot;string2&quot;) may be an exception, as the alternative requires quite a bit of template magic, but the resulting concatenated value should then be stored in a static constant. [<a href="#ecpp">EC++</a> Item 2]</li>
+    </ul>
+    <h2 id="mechanics">Mechanical Style</h2>
+    <h3 id="compilation">Compilation</h3>
+    <ul>
+      <li><strong class=recommend>Code should at least be compiled with &quot;-Wreturn-type -Wreorder&quot;</strong><br>...as these warnings signal unexpected behavior of the compiled code.  Consider &quot;-Wall&quot;, if the output doesn&apos;t yield too many false positives.</li>
+    </ul>
+    <h3 id="directories">Directory Structure</h3>
+    <ul>
+      <li><strong>include/</strong> should contain publicly installed header files</li>
+      <li><strong>src/</strong> should include code for the installed executable/library, including any private header files</li>
+      <li><strong>test/</strong> should include any testing code not included in the installed executable/library</li>
+      <li><strong class=recommend>Within src/, a single level of subdirectory should be used to organize files by functional area.</strong><br>There should be a clear hierarchy-of-reference between functional areas (application logic should refer to infrastructure logic which should refer to utility logic, with no back-references.  Use templates if necessary.).  All files within src/ should be in one of these subdirectories, with exceptions for a file including &quot;main&quot; and any argument-parsing logic. [<a href="#lakos">Lakos</a>]</li>
+    </ul>
+    <h3 id="headers">Header Files</h3>
+    <ul>
+      <li><strong class="recommend">Should be suffixed &quot;.hpp&quot; for maximum editor detectability.</strong></li>
+      <li><strong class="recommend">Should contain one major class definition</strong><br>...and be named after that class with the same casing.</li>
+      <li><strong class="recommend">Should have a unique #ifndef, #define, #endif include-guard derived from the file name.</strong></li>
+      <li><strong class="recommend">Should be namespaced with full literal &quot;namespace&quot; blocks</strong><br>...ideally with a project-level namespace and then namespaces following the directory structure.  No &quot;using&quot; statements should be used, as these can pollute files that include this header.</li>
+      <li><strong class="recommend">Should include header files needed for compilation of this header file on its own</strong><br>...i.e. for any classes stored by value or operated on with the &quot;.&quot; or &quot;->&quot; operator.</li>
+      <li><strong class="recommend">Should contain forward-declarations for any classes stored by reference or pointer.</strong></li>
+      <li><strong class="recommend">Order of includes should be standard library headers in alphabetical order</strong><br>...followed by other library headers in alphabetical order, followed by headers from the current project in alphabetical order.</li>
+      <li><strong class="recommend">Declare single-line functions inline (but not using the &quot;inline&quot; keyword)</strong><br>...especially getters and setters.</li>
+    </ul>
+    <h3 id="sources">Source Files</h3>
+    <ul>
+      <li><strong class="recommend">Should be suffixed &quot;.cpp&quot;</strong></li>
+      <li><strong class="recommend">Should have includes in the same order as header files</strong><br>...except it should begin with a single include of the same name as the cpp file if such a file exists.</li>
+      <li><strong class="recommend">Should have a single &quot;using namespace X;&quot; statement to refer to its own component.</strong><br>Other &quot;using&quot; statements should spell out full types, and not import entire namespaces.  &quot;Using namespace std;&quot; is not recommended, but can be used in accordance with personal preferences.</li>
+      <li><strong class="recommend">Cpp files for templated classes that need to be headers should be named &quot;FileName-inl.hpp&quot;</strong><br>...and included within their parent header as the last statement.  An include guard isn&apos;t necessary as this file will only be included from one other file.</li>
+    </ul>
+
+    <h3 id="spacing">Spacing</h3>
+    <ul>
+      <li><strong class="recommend">Prefer &quot;Allman&quot;, also known as &quot;BSD&quot;, style:</strong><br>4 spaces with open and close braces on their own line, aligned with the preceding declaration or control statement.  This creates visual space that makes code more readable on modern displays.</li>
+      <li><strong class="recommend">Lines over 80 characters should be broken into multiple lines</strong><br>...and indented on an ad-hoc basis (i.e. to align with opening parentheses).  This shouldn&apos;t affect indentation of subsequent lines.</li>
+      <li><strong class="recommend">All functions and control flow statements should follow the Allman style regardless of number of statements:</strong>
+        <ul>
+          <li>Braces should always be on separate lines, even if the body is brief.</li>
+          <li>Control flow statements should always have braces even if there is only one statement in the body.</li>
+          <li>One potential exception is &quot;if (<expression>) return/continue/break;&quot; due to the fact that the interruption of control flow is more semantically associated with the parent scope.  This should NEVER be on two lines, however, due to the potential for a &quot;goto fail&quot;-style bug.</li>
+        </ul>
+      </li>
+      <li><strong class="recommend">Lambdas that can comfortably fit on a single line can remain on a single line.</strong></li>
+      <li><strong class="discourage">No more than two levels of nested indenting in a function.</strong><br>A &quot;for&quot; or &quot;while&quot; loop with &quot;if&quot; statements is the ideal maximum level of nesting.  After that, make a function.</li>
+    </ul>
+
+    <h3 id="switch">&quot;Switch&quot; Statements</h3>
+    <ul>
+      <li><strong class="recommend">Fallthrough between immediate adjacent &quot;case&quot; statements is ok without comments.</strong><br>Fallthrough after code in between &quot;case&quot; statements must be commented.</li>
+      <li><strong class="recommend">&quot;Case&quot; statements should be aligned with &quot;switch&quot;</strong><br>...and contain nothing else on the line.</li>
+      <li><strong class="discourage">No control flow (if/for/while) within a &quot;switch&quot; block.</strong><br>Make a function.</li>
+    </ul>
+
+    <h3 id="casing">Casing</h3>
+    <ul>
+      <li>Namespaces, classes, structs, enums, functions, static member variables, and type names (typdefs, usings, and template type arguments) should be cased <strong>LikeThis</strong>.</li>
+      <li>Local variables and public member variables should be cased <strong>likeThis</strong>.</li>
+      <li>Protected and private member variables should be cased <strong>m_likeThis</strong>.</li>
+      <li>File-level (including anonymous namespaces) and global-level constants should cased <strong>LIKE_THIS</strong>.</li>
+      <li>Global-level non-constant variables should be cased <strong>gLikeThis</strong>.</li>
+      <li>Exceptions should be made to follow casing rules for any external library element whose name is borrowed for a method or member.  Examples: &quot;std::ostream &amp;ostream() { ... }&quot;, &quot;boost::asio::io_service m_io_service;&quot;</li>
+    </ul>
+
+    <h3 id="classes">Classes</h3>
+    <ul>
+      <li><strong class="recommend">&quot;public&quot;, &quot;protected&quot;, and &quot;private&quot; statements should align with the class statement and be listed in that order.</strong><br>Sections may be repeated if necessary to control order of initialization.</li>
+      <li><strong class="recommend">The first declarations should be the constructors</strong><br>...in increasing number of arguments, followed by the destructor (if present).</li>
+      <li><strong class="recommend">Single argument constructors should use &quot;explicit&quot;.</strong></li>
+    </ul>
+
+    <h3 id="constants">Constants</h3>
+    <ul>
+      <li><strong class="recommend">Constants should be const variables</strong><br>...and defined in as restrictively a namespace is as feasible: within an anonymous namespace in a cpp file, or as a class static constant are both ideal options.</li>
+      <li><strong class="discourage">Constants should not be macros</strong><br>...unless defined externally e.g. by the build system.</li>
+    </ul>
+
+    <h2 id="references">References and Supplemental Reading Material</h2>
+    <ul>
+      <li id="ecpp"><em>Effective C++</em>, Third Edition, Scott Meyers [EC++]
+        <ul class="followup"><li>(highly recommended for the beginner- to advanced-level programmer)</li></ul>
+      </li>
+      <li id="estl"><em>Effective STL</em>, Scott Meyers [ESTL]</li>
+      <li id="emcpp"><em>Effective Modern C++</em>, Scott Meyers [EMC++]
+        <ul class="followup"><li>(highly recommended for the advanced- to expert-level programmer)</li></ul>
+      </li>
+      <li id="xcpp"><em>Exceptional C++</em>, Herb Sutter [XC++]</li>
+      <li id="lakos"><em>Large-Scale C++ Software Design</em>, John Lakos [Lakos]</li>
+    </ul>
+    <p><a rel="license" href="http://creativecommons.org/licenses/by/4.0/"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by/4.0/88x31.png" /></a><br />This work is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by/4.0/">Creative Commons Attribution 4.0 International License</a>.</p>
+  </body>
+</html>
