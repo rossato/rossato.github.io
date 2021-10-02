@@ -1,0 +1,106 @@
+---
+weight: 182.6
+VDOT: 29
+goal: '27:00'
+---
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-F3w7mX95PdgyTmZZMECAngseQB83DfGTowi0iMjiWaeVhAn4FJkqJByhZMI3AhiU" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@5.9.0/main.min.css" integrity="sha256-FjyLCG3re1j4KofUTQQXmaWJw13Jdb7LQvXlkFxTDJI=" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.9.0/main.min.js" integrity="sha256-8nl2O4lMNahIAmUnxZprMxJIBiPv+SzhMuYwEuinVM0=" crossorigin="anonymous"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        var calendarEl = document.getElementById('calendar');
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+            events: [
+                {%- for race in site.data.races %}
+                {
+                    "title":"{{race.name}}",
+                    "start":"{{race.date | date: "%Y-%m-%d" }}",
+                    "allDay":true,
+                    "backgroundColor":"red",
+                },
+                {%- endfor %}
+                {%- for item in site.data.training %}
+                {
+                    "title":"{{item.activity}}",
+                    "start":"{{item.date | date: "%Y-%m-%d" }}",
+                    "allDay":true,
+                    "backgroundColor":"green",
+                }{%unless forloop.last%},{%endunless%}
+                {%- endfor %}
+            ]
+        });
+        calendar.render();
+
+        // Set the date we're counting down to
+        var countDownDate = new Date("{{ site.data.races.first.date | date: "%Y-%m-%dT%R"  }}").getTime();
+
+        // Update the count down every 1 second
+        var x = setInterval(function() {
+
+            // Get today's date and time
+            var now = new Date().getTime();
+            
+            // Find the distance between now and the count down date
+            var distance = countDownDate - now;
+
+            // Time calculations for days, hours, minutes and seconds
+            var days = Math.floor(distance / (1000 * 60 * 60 * 24));
+            var hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            var minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            var seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+            // Display the result in the element with id="demo"
+            document.getElementById("countdown").innerHTML = days + "d " + hours + "h "
+                + minutes + "m " + seconds + "s";
+
+            // If the count down is finished, write some text
+            if (distance < 0) {
+                clearInterval(x);
+                document.getElementById("countdown").innerHTML = "NOW";
+            }
+        }, 1000);
+      });
+    </script>
+    <title>Ken's Running Page</title>
+  </head>
+  <body>
+    <div class="container">
+    <h1>Ken's Running Page</h1>
+    <p><em>Last Updated: {{ site.time | date_to_string: "ordinal", "US" }}</em></p>
+
+    {%- assign year = site.time | date: "%Y" | to_integer %}
+    {%- assign month = site.time | date: "%m" | to_integer %}
+    {%- assign age = year | minus: 1983 %}
+    {%- if month < 10 %}
+       {%- assign age = age | minus: 1 %}
+    {%- endif %}
+                   
+    <p class=lead>Ken is {{ age }}, m, {{ page.weight }} lb, <a href="https://runsmartproject.com/calculator/">VDOT</a> = {{ page.VDOT }}</p>
+
+    <p class=lead><span id="countdown"></span> until the <a href="{{ site.data.races.first.url }}">{{ site.data.races.first.name }}</a> (goal time: {{ page.goal }}).</p>
+
+    <div id='calendar'></div>
+    <h2>Races</h2>
+    <p>This season's races:</p>
+    <dl class="row">
+      {%- for item in site.data.races %}
+      <dt class="col-sm-6">{{ item.date | date: "%A at %l:%M%P, on %b %e" }}</dt>
+      <dd class="col-sm-6"><a href="{{ item.url }}">{{ item.name }}</a></dd>
+      {%- endfor %}
+    </dl>
+    <h2>Training</h2>
+    <p>Ken is in Phase I of Daniels' Season Training Plan</p>
+    <p>Recent training activity:</p>
+    <dl class="row">
+      {%- for item in site.data.training %}
+      <dt class="col-sm-3">{{ item.date | date: "%A %b %e" }}</dt><dd class="col-sm-9">{{ item.activity }}</dd>
+      {%- endfor %}
+    </dl>
+    </div>
+  </body>
+</html>
