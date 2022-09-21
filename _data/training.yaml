@@ -1,10 +1,35 @@
-- activity: 3E
-  date: Oct 4, 2021
-- activity: 4L
-  date: Oct 2, 2021
-- activity: 3E
-  date: Sept 30, 2021
 - activity: 2E
-  date: Sept 28, 2021
+  date: Aug 28, 2022
 - activity: 3E
-  date: Sept 26, 2021
+  date: Aug 29, 2022
+- activity: 2E
+  date: Sep 1, 2022
+- activity: 3E
+  date: Sep 2, 2022
+- activity: Crosstrain
+  date: Sep 4, 2022
+- activity: 1E
+  date: Sep 5, 2022
+- activity: 4L
+  date: Sep 8, 2022
+- activity: 5x(3:00 T + 2:00 W)
+  date: Sep 10, 2022
+- activity: 3E + 6ST
+  date: Sep 11, 2022
+- activity: 3E
+  date: Sep 12, 2022
+- activity: 8x(0.15 R + 0.15 jg)
+  date: Sep 13, 2022
+- activity: 3E XC
+  date: Sep 15, 2022
+- activity: 5L
+  date: Sep 16, 2022
+- activity: Crosstrain
+  date: Sep 17, 2022
+- activity: 2E
+  date: Sep 18, 2022
+- activity: 4x(5:00 T + 1:00 jg)
+  date: Sep 19, 2022
+- activity: 4E XC
+  date: Sep 20, 2022
+

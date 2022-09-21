@@ -1,7 +1,8 @@
 ---
-weight: 181.0
-VDOT: 29
-goal: '30:00'
+weight: 170.2
+VDOT: 34
+goal: '1:00:00'
+phase: II
 ---
 <!DOCTYPE html>
 <html>
@@ -16,6 +17,14 @@ goal: '30:00'
         var calendarEl = document.getElementById('calendar');
         var calendar = new FullCalendar.Calendar(calendarEl, {
             events: [
+                {%- for result in site.data.results %}
+                {
+                    "title":"{{result.name}}",
+                    "start":"{{result.date | date: "%Y-%m-%d" }}",
+                    "allDay":true,
+                    "backgroundColor":"red",
+                },
+                {%- endfor %}
                 {%- for race in site.data.races %}
                 {
                     "title":"{{race.name}}",
@@ -80,27 +89,27 @@ goal: '30:00'
        {%- assign age = age | minus: 1 %}
     {%- endif %}
                    
-    <p class=lead>Ken is {{ age }}, m, {{ page.weight }} lb, <a href="https://runsmartproject.com/calculator/">VDOT</a> = {{ page.VDOT }}</p>
+    <p class=lead>Ken is {{ age }}, m, {{ page.weight }} lb, <a href="https://runsmartproject.com/calculator/">VDOT</a> = {{ page.VDOT }}, in phase {{ page.phase }} (Daniels) of the running season.</p>
 
     <p class=lead><span id="countdown"></span> until the <a href="{{ site.data.races.first.url }}">{{ site.data.races.first.name }}</a> (goal time: {{ page.goal }}).</p>
 
-    <div id='calendar'></div>
     <h2>Races</h2>
-    <p>This season's races:</p>
+    <p>Season results:</p>
+    <dl class="row">
+      {%- for item in site.data.results %}
+      <dt class="col-sm-4">{{ item.result }} (<a href="{{ item.garmin }}">Garmin</a>)</dd>
+      <dd class="col-sm-4"><a href="{{ item.url }}">{{ item.name }}</a></dd>
+      <dd class="col-sm-4">{{ item.date | date: "%A at %l:%M%P, on %b %e" }}</dt>
+      {%- endfor %}
+    </dl>
+    <p>Upcoming races:</p>
     <dl class="row">
       {%- for item in site.data.races %}
       <dt class="col-sm-6">{{ item.date | date: "%A at %l:%M%P, on %b %e" }}</dt>
       <dd class="col-sm-6"><a href="{{ item.url }}">{{ item.name }}</a></dd>
       {%- endfor %}
     </dl>
-    <h2>Training</h2>
-    <p>Ken is in Phase I of Daniels' Season Training Plan</p>
-    <p>Recent training activity:</p>
-    <dl class="row">
-      {%- for item in site.data.training %}
-      <dt class="col-sm-3">{{ item.date | date: "%A %b %e" }}</dt><dd class="col-sm-9">{{ item.activity }}</dd>
-      {%- endfor %}
-    </dl>
+    <div id='calendar'></div>
     </div>
   </body>
 </html>
