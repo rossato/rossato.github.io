@@ -1,8 +1,8 @@
 ---
-weight: 170.2
-VDOT: 34
-goal: '1:00:00'
-phase: II
+weight: 167.8
+VDOT: 37
+goal: '26:00'
+phase: III
 ---
 <!DOCTYPE html>
 <html>
@@ -89,7 +89,7 @@ phase: II
        {%- assign age = age | minus: 1 %}
     {%- endif %}
                    
-    <p class=lead>Ken is {{ age }}, m, {{ page.weight }} lb, <a href="https://runsmartproject.com/calculator/">VDOT</a> = {{ page.VDOT }}, in phase {{ page.phase }} (Daniels) of the running season.</p>
+    <p class=lead>Ken is {{ age }}, m, {{ page.weight }} lb, <a href="https://runsmartproject.com/calculator/">VDOT</a> = {{ page.VDOT }}, in phase {{ page.phase }} of the running season.</p>
 
     <p class=lead><span id="countdown"></span> until the <a href="{{ site.data.races.first.url }}">{{ site.data.races.first.name }}</a> (goal time: {{ page.goal }}).</p>
 
