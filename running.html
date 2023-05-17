@@ -1,8 +1,4 @@
 ---
-weight: 154.6
-VDOT: 41
-goal: '1:50:00'
-phase: IV
 ---
 <!DOCTYPE html>
 <html>
@@ -44,35 +40,6 @@ phase: IV
             ]
         });
         calendar.render();
-
-        // Set the date we're counting down to
-        var countDownDate = new Date("{{ site.data.races.first.date | date: "%Y-%m-%dT%R"  }}").getTime();
-
-        // Update the count down every 1 second
-        var x = setInterval(function() {
-
-            // Get today's date and time
-            var now = new Date().getTime();
-            
-            // Find the distance between now and the count down date
-            var distance = countDownDate - now;
-
-            // Time calculations for days, hours, minutes and seconds
-            var days = Math.floor(distance / (1000 * 60 * 60 * 24));
-            var hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-            var minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-            var seconds = Math.floor((distance % (1000 * 60)) / 1000);
-
-            // Display the result in the element with id="demo"
-            document.getElementById("countdown").innerHTML = days + "d " + hours + "h "
-                + minutes + "m " + seconds + "s";
-
-            // If the count down is finished, write some text
-            if (distance < 0) {
-                clearInterval(x);
-                document.getElementById("countdown").innerHTML = "NOW";
-            }
-        }, 1000);
       });
     </script>
     <title>Ken's Running Page</title>
@@ -82,31 +49,19 @@ phase: IV
     <h1>Ken's Running Page</h1>
     <p><em>Last Updated: {{ site.time | date_to_string: "ordinal", "US" }}</em></p>
 
-    {%- assign year = site.time | date: "%Y" | to_integer %}
-    {%- assign month = site.time | date: "%m" | to_integer %}
-    {%- assign age = year | minus: 1983 %}
-    {%- if month < 10 %}
-       {%- assign age = age | minus: 1 %}
-    {%- endif %}
-                   
-    <p class=lead>Ken is {{ age }}, m, {{ page.weight }} lb, <a href="https://runsmartproject.com/calculator/">VDOT</a> = {{ page.VDOT }}, in phase {{ page.phase }} of the running season.</p>
-
-    <p class=lead><span id="countdown"></span> until the <a href="{{ site.data.races.first.url }}">{{ site.data.races.first.name }}</a> (goal time: {{ page.goal }}).</p>
-
-    <h2>Races</h2>
-    <p>Season results:</p>
+    <h3>Season Results</h3>
     <dl class="row">
       {%- for item in site.data.results %}
-      <dt class="col-sm-4">{{ item.result }} (<a href="{{ item.garmin }}">Garmin</a>)</dd>
-      <dd class="col-sm-4"><a href="{{ item.url }}">{{ item.name }}</a></dd>
-      <dd class="col-sm-4">{{ item.date | date: "%A at %l:%M%P, on %b %e" }}</dt>
+      <dt class="col-lg-4">{{ item.result }} (<a href="{{ item.garmin }}">Garmin</a>)</dd>
+      <dd class="col-lg-4"><a href="{{ item.url }}">{{ item.name }}</a></dd>
+      <dd class="col-lg-4">{{ item.date | date: "%A %b %e, %Y" }}</dt>
       {%- endfor %}
     </dl>
-    <p>Upcoming races:</p>
+    <h3>Upcoming Races</h3>
     <dl class="row">
       {%- for item in site.data.races %}
-      <dt class="col-sm-6">{{ item.date | date: "%A at %l:%M%P, on %b %e" }}</dt>
-      <dd class="col-sm-6"><a href="{{ item.url }}">{{ item.name }}</a></dd>
+      <dt class="col-lg-4">{{ item.date | date: "%A at %l:%M%P, on %b %e" }}</dt>
+      <dd class="col-lg-8"><a href="{{ item.url }}">{{ item.name }}</a></dd>
       {%- endfor %}
     </dl>
     <div id='calendar'></div>
