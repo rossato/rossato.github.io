@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-F3w7mX95PdgyTmZZMECAngseQB83DfGTowi0iMjiWaeVhAn4FJkqJByhZMI3AhiU" crossorigin="anonymous">
+    <title>Ken Rossato - Lab Network</title>
+  </head>
+  <body style="font-family: serif; color: #444; background: #f5f5f5;">
+    <div class="container">
+      <div class="row py-5 px-3 align-items-center">
+        <div class="col-md-2">
+          <img class="img-fluid" src="kenrossato_headshot.jpg"/>
+        </div>
+        <div class="col-md-10">
+          <h1 class="display-5 fw-bold text-body-emphasis">Ken Rossato</h1>
+          <h2 style="font-style: italic; font-size: 152%;">DevOps Architect and Linux-Native Software Consultant</h2>
+        </div>
+      </div>
+      <div class="row px-3">
+        <div class="col-lg-2">
+          <h5>Pages</h5>
+          <ul style="list-style-type: none;">
+            <li><a href="index.html">Introduction</a></li>
+            <li><a href="lab.html">Lab Network</a></li>
+            <li><a href="cpp-style-guide.html">C++ Style Guide</a></li>
+            <li><a href="running.html">Running Log</a></li>
+          </ul>
+          <h5>Socials</h5>
+          <ul style="list-style-type: none;">
+            <li><a href="https://github.com/rossato/">GitHub</a></li>
+            <li><a href="https://www.linkedin.com/in/ken-rossato-589a1515/">LinkedIn</a></li>
+            <li><a href="https://www.youtube.com/channel/UC1YFIz1YpQqYNcrycZJTFtg">YouTube</a></li>
+          </ul>
+        </div>
+        <div class="col-lg-10">
+          <p><strong style="font-variant-caps: small-caps;">I purchased</strong> some server hardware and faced some interesting network design decisions.  Here's what I ended up with:</p>
+          <img style="padding: 20px;" src="homelab-network.png"/>
+          <h5>Step 1: Configuring the lab network</h5>
+          <p>I bought a GL.iNet wireless AC travel router to connect my server hardware with the home network.  I wanted the new "lab" connected wirelessly to maximize flexibility in where the servers could live long term (with potential noise and power demands).  I also wanted the ability to quickly disconnect my lab hardware and take it on the road for demos.  Those two considerations drove a lot of decisions.</p>
+
+          <p>After connecting the router as a client to my home's Wi-Fi, <strong>I set the lab router's wired LAN to a /22 subnet in the class C range</strong> to provide room for expansion.  <strong>Then I disabled NATing</strong> so traffic could cross easily between the home and lab networks in both directions without port forwarding.  The wireless connection is still DHCP so the lab router is not dependent on the environment in the WAN zone.</p>
+
+          <h5>Step 2: Configuring the home network</h5>
+          <p>I don't have much choice in my default gateway device without double-NATing: my Verizon FiOS coax modem performs routing duties within the home network and NATs to the greater Internet.  <strong>I added a route to the modem's routing table to direct lab traffic to the lab router IP address,</strong> which I would later configure with a static DHCP lease.  A while ago I set up an Asus Wi-Fi router in Wireless Access Point (bridged) mode, so the home network is flat across wired and wireless devices.</p>
+
+          <p>One tweak I found necessary to allow traffic from the lab to reach the internet: <strong>I changed the FiOS router's LAN netmask to include both home and LAN networks.</strong>  This was a bit of a lie, but necessary for lab traffic to be NATed, and it did not negatively impact internal traffic (you might worry lab traffic would no longer route to the lab router, but it works).</p>
+
+          <h5>Step 3: Configuring DNS and DHCP on the home network</h5>
+          <p>To have any flexibility in configuring DNS, I needed to get DNS functions off of the FiOS router.  It only has the ability to set simple one-level hostnames with a single IP address, which is insufficient.  The Asus router did not have the ability to host DNS and DHCP (dnsmasq) in bridged mode, so I researched custom firmware options.  <strong>I installed Asuswrt-merlin on the Asus AP.</strong></p>
+
+          <p><strong>I set a static IP configuration, then created a startup script that would add a few entries to the /etc/ethers and /etc/hosts files and run dnsmasq.</strong>  The lab router and my workstation would have static DHCP leases and other devices dynamic leases like normal.  <strong>I set DHCP option 3 (default gateway) to the IP address of the FiOS router, and added a "server" line for ".lab.home" to the IP of the lab router.</strong> Then I disabled DNS and DHCP on the FiOS router.</p>
+
+          <p>In this configuration, devices in the home network function correctly in the absence of the lab router, but they can use it to reach the lab when it is available.</p>
+
+          <h5>Step 4: Configuring DNS and DHCP on the lab network</h5>
+          <p><strong>Lastly I set up dnsmasq on the lab router to handle DNS and DHCP for the lab network.</strong>  Since I would be deploying OpenShift, I would need to control several DNS entries including wildcards, plus issue static DHCP leases to known hardware and VMs.  As an additional feature, <strong>I added additional IP addresses to the LAN ethernet interface for load-balancing endpoints and balanced them using DNAT iptables rules in the prerouting table</strong> (and corresponding SNAT rules so return traffic would work).</p>
+
+          <p>That's it, that's the entire configuration.  The lab router controls the lab subnet, and in the home subnet the FiOS box does routing and the Asus WI-FI access point does DNS and DHCP, correctly splitting traffic between lab, home, and Internet.</p>
+        </div>
+      </div>
+      <div class="row px-3">
+        <div class="col-lg-2">
+        </div>
+        <div class="col-lg-10">
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
