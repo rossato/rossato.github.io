@@ -1,0 +1,29 @@
+---
+title: DevOps Kit
+layout: default
+---
+<p><strong style="font-variant-caps: small-caps;">After</strong> working with Kubernetes DevOps tools for some time, two principles have emerged to me as must-have requirements:</p>
+<ol>
+  <li>State should be reproduceable from declarative artifacts</li>
+  <li>Responsibility (and permission) should be pushed as close to the individual contributor as possible</li>
+</ol>
+
+<p>One particular practice I see used sometimes but disagree with is the use of imperative artifacts like shell scripts and Groovy pipelines.  The problem with scripting is similar to the problem of handling exceptions in object-oriented code: a number of unstated assumptions could cause behavior to differ from the author's environment, and when the subsequent failures inevitably occur, recovery from a partial state becomes problematic (or at least unclear to the end-user).</p>
+
+<p>Because of that, my preference is to leverage declarative, YAML-backed solutions wherever possible, whether that's with Ansible, ArgoCD, Kustomize, or Helm.  The workflow I'm about to describe uses all four.</p>
+
+<h5>Step 0: Cluster Installation</h5>
+<p>Cluster installation is a non-goal of this kit. Current versions of Red Hat OpenShift have a fairly hands-off installation with either the command-line or Assisted Installer.  For an even more automated experience Advanced Cluster Management (RHACM) can be used.</p>
+
+<h5>Step 1: Bootstrapping</h5>
+<p>I will lean on ArgoCD for as much cluster infrastructure configuration as possible, but something has to install ArgoCD.  For this purpose I use Ansible to create the ArgoCD subscription and app-of-apps.  Ansible has the advantage of allowing <em>some</em> sequential logic, such as status checks or prompts, which while slightly violating our desire for declarative processes ends up strengthening reliability more than it harms it.  This is in part due to the convention of Ansible roles and playbooks to be as idempotent as possible.</p>
+
+<h5>Step 2: Infrastructure Configuration</h5>
+<p>For cluster configuration I use ArgoCD to configure as much as possible.  This includes Operator subscriptions (and related custom resources), namespace creation, and RBAC.  For infrastructure config purposes, the default instance created by the OpenShift Gitops operator in the openshift-gitops namespace is ideal.  It has broad permissions but these are highly privleged activities that result in cluster-wide changes, so the permission model is a good fit.  Note that by default only ClusterAdmins have interactive access to openshift-gitops; be sure to lock down the infrastructure config Git repository accordingly (and have processes for approving changes to the main branch).</p>
+
+<h5>Step 3: Application Configuration</h5>
+<p>One of the things deployed by step 2 above will be another ArgoCD instance.  This instance will be namespace-scoped to an "app-gitops" project, having no cluster-wide permissions except the defaults necessary for ArgoCD to operate.  The infrastructure ArgoCD will be responsible for deploying all namespaces that the "app" ArgoCD instance manages, along with Quotas, ResourceLimits, and RBAC (things that, in general, application teams should not be able to change without IT department approval).</p>
+
+<p>This second ArgoCD instance will serve all application teams, but divide visibility and access via AppProject custom resources.  The infra ArgoCD (or a group-sync process) will manage group membership and these users will have permissions to their ArgoCD AppProject and corresponding application namespaces.</p>
+  
+<p>The end result of this process is that users can fully self-serve their application CI and CD experiences (one option strongly aligned with this methodology would be to use Tekton and Helm) and use gitops for that self-service.  Since neither application teams nor the application ArgoCD instance have any permissions related to viewing or altering cluster-wide configuration, the IT department has the assurances it needs to give application teams this robust level of access.  It is even possible to fully destroy and recreate the app ArgoCD instance and containing namespace without any impact on cluster ops.</p>
