@@ -1,9 +1,12 @@
-- name: Run Aware XC 5k
-  date: "May 21 08:00 2023"
-  url: https://mcrrc.org/calendar-event/run-aware-xc-5k-2023/
-- name: Memorial 4 Mile
-  date: "May 29 08:00 2023"
-  url: https://mcrrc.org/calendar-event/memorial-4-mile-2023/
-- name: Little Bennett 10k XC
-  date: "June 3 07:30 2023"
-  url: https://mcrrc.org/calendar-event/little-bennett-10k-xc-2023/
+- name: Kentlands Lakelands 5k
+  date: "Sep 2 08:30 2023"
+  url: https://www.kentlands.org/kentlands-5k/
+- name: Parks Half Marathon
+  date: "Sep 10 06:45 2023"
+  url: https://www.parkshalfmarathon.com/
+- name: Black Hill 10k XC
+  date: "Oct 7 09:00 2023"
+  url: https://mcrrc.org/calendar-event/black-hill-10k-2023/
+- name: Marine Corps Marathon
+  date: "Oct 29 07:55 2023"
+  url: https://www.marinemarathon.com/event/marine-corps-marathon/
