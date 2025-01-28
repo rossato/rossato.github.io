@@ -1,0 +1,35 @@
+---
+title: LUKS-encrypting Optical Media
+layout: default
+---
+          <p><strong style="font-variant-caps: small-caps;">GNOME</strong> has support for mounting <a href="https://gitlab.com/cryptsetup/cryptsetup/blob/master/README.md">LUKS</a>-encrypted filesystems.  While I imagine this is mostly used with thumb-drives (which can be directly encrypted from the <em>Disks</em> app), we can take advantage of this support to burn optical (DVD or BD) media which requires a code to decrypt.  This allows us to create archival backups of personal files that can be safely disposed of by simply separating the disc from the code.  The code can be added to a password manager, or if physical theft is not a concern (or the backups are intended to be accessible by others) the code can be printed onto a jewel-case insert or post-it note with a reminder to remove before disposal.</p>
+          <p>Credit to Frederick Ding for <a href="https://www.frederickding.com/posts/2017/08/luks-encrypted-dvd-bd-data-disc-guide-273316/">the workflow that inspired this.</a>  The purpose of my differences are to avoid creating a larger ISO file (and burning session) than necessary.</p>
+          <h5>Step 1: Generate an unencrypted ISO</h5>
+
+          <p><code>genisoimage -o image.iso -V "Volume name" -r -hide-rr-moved files</code></p>
+
+          <p>Rock Ridge for long file-names and deep directories is a good idea, Windows isn't going to be compatible so why bother with Joliet.  Loopback-mount the ISO to ensure it looks how you want before burning a coaster.  Alternately you can do this step in a disc-burning application like <em>Brasero</em>, but I found this gets more cumbersome as the number of files increases.</p>
+          
+          <h5>Step 2: Append blank space for the LUKS header</h5>
+          <p></p>
+
+          <p><code>truncate -s +32M image.iso</code></p>
+
+          <h5>Step 3: Encrypt the ISO file</h5>
+
+          <p><code>sudo cryptsetup reencrypt --encrypt --type luks2 --sector-size 2048 --reduce-device-size 32M image.iso</code></p>
+
+          <p>
+            sudo is required, but hopefully only this step. From <a href="https://www.man7.org/linux/man-pages/man8/cryptsetup-reencrypt.8.html">man 8 cryptsetup-reencrypt</a>:
+            <blockquote>
+            <code>--reduce-device-size <em>size</em></code><br/><br/>
+            This means that last <em>size</em> sectors on the original device will be lost, data will be effectively shifted by specified number of sectors.
+            <br/><br/>
+            It could be useful if you added some space to underlying partition or logical volume (so last <em>size</em> sectors contains no data).
+            <br/><br/>[...]<br/><br/>
+            Recommended minimal size is twice the default LUKS2 header size (--reduce-device-size 32M) for encryption mode.
+          </blockquote></p>
+          <h5>Step 4: Burn it with growisofs</h5>
+          <p><code>growisofs -dvd-compat -Z /dev/sr0=image.iso</code></p>
+
+          <p></p>
